@@ -10,6 +10,8 @@ const {
 const PORT =
     Number(process.env.PORT) || 3000;
 
+let monthlyReportTask = null;
+
 const server =
     http.createServer((req, res) => {
         if (req.url === '/health') {
@@ -43,22 +45,41 @@ server.listen(PORT, () => {
     );
 });
 
-bot.launch()
-    .then(() => {
+async function startBot() {
+    try {
+        const me =
+            await bot.telegram.getMe();
+
         console.log(
-            '🤖 Telegram bot je uspješno pokrenut.'
+            `🤖 Telegram bot autentifikovan kao @${me.username || me.id}.`
         );
 
-        startMonthlyReportScheduler(bot);
-    })
-    .catch((error) => {
+        monthlyReportTask =
+            startMonthlyReportScheduler(bot);
+
+        bot.launch().catch((error) => {
+            console.error(
+                'Telegram polling je prekinut:',
+                error
+            );
+
+            process.exit(1);
+        });
+
+        console.log(
+            '🤖 Telegram polling je pokrenut.'
+        );
+    } catch (error) {
         console.error(
             'Bot se nije mogao pokrenuti:',
             error
         );
 
         process.exit(1);
-    });
+    }
+}
+
+startBot();
 
 async function shutdown(signal) {
     console.log(
@@ -66,6 +87,10 @@ async function shutdown(signal) {
     );
 
     try {
+        if (monthlyReportTask) {
+            monthlyReportTask.stop();
+        }
+
         bot.stop(signal);
     } finally {
         server.close(() => {
