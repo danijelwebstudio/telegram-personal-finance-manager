@@ -4,10 +4,21 @@ A private Telegram-based personal finance system built for a real multi-currency
 
 The project started because generic budgeting apps did not match the way I actually manage physical cash across different currencies and locations. The bot is used directly through Telegram and keeps PostgreSQL/Supabase as the source of truth.
 
+## Tech Stack
+
+- Node.js
+- Telegraf
+- Supabase
+- PostgreSQL
+- PostgreSQL RPC functions
+- node-cron
+- Render
+- Node.js built-in test runner
+
 ## What it handles
 
 - Income and expenses in RSD, EUR and BAM
-- Physical money locations such as daily wallet and safes
+- Physical money locations such as a daily wallet and safes
 - Transfers between locations
 - Currency exchange with real-world returned change
 - Effective exchange-rate tracking
@@ -16,13 +27,33 @@ The project started because generic budgeting apps did not match the way I actua
 - Atomic wallet + ledger updates in PostgreSQL
 - Daily-wage tracking
 - Current and previous-month reports
-- Automatic report on the first day of each month
+- Automatic monthly report delivery
 - Telegram user whitelist
 - Render-compatible health server
 
+## Screenshots
+
+The screenshots below show the real Telegram interface using synthetic demo data.  
+No personal financial information is displayed.
+
+| Multi-currency wallets | Monthly report |
+|---|---|
+| <img src="docs/images/wallet-balances.png" width="300" alt="Multi-currency wallet balances"> | <img src="docs/images/monthly-report.png" width="300" alt="Monthly financial report"> |
+
+| Debt tracking | Partial debt payment |
+|---|---|
+| <img src="docs/images/debts.png" width="300" alt="Debt tracking"> | <img src="docs/images/partial-payment.png" width="300" alt="Partial debt payment"> |
+
+The screenshots demonstrate:
+
+- **Multi-currency wallets** — RSD, EUR and BAM distributed across physical cash locations.
+- **Monthly reporting** — income, expenses, net result, largest transactions and spending categories.
+- **Debt tracking** — receivables and liabilities in multiple currencies.
+- **Partial repayments** — debts can be partially paid while the remaining amount stays active.
+
 ## Real-world exchange example
 
-Instead of pretending that all cash handed to an exchange office was converted, the bot models returned change:
+Instead of assuming that all cash handed to an exchange office was converted, the bot models returned change.
 
 ```text
 /zamijeni džep dao 12000 rsd dobio 100 eur kusur 200 rsd
@@ -95,7 +126,7 @@ Previous month:
 /izvjestaj prosli
 ```
 
-The scheduler sends the completed previous-month report on the first day of each month at 09:00 Europe/Belgrade.
+The scheduler sends the completed previous-month report on the first day of each month at 09:00 in the `Europe/Belgrade` timezone.
 
 Currencies are reported separately. RSD, EUR and BAM are never incorrectly added into one total.
 
@@ -104,7 +135,7 @@ Currencies are reported separately. RSD, EUR and BAM are never incorrectly added
 ```text
 Telegram
    |
- Telegraf
+Telegraf
    |
 Command / callback handlers
    |
@@ -117,7 +148,19 @@ PostgreSQL RPC functions
 wallets / transactions / transfers / debts / debt_payments
 ```
 
-Financial operations that affect more than one record are handled atomically in PostgreSQL so a wallet balance cannot be changed without the related ledger/debt record being updated in the same operation.
+Financial operations that affect more than one record are handled atomically in PostgreSQL so a wallet balance cannot be changed without the related ledger or debt record being updated in the same operation.
+
+## Database design
+
+The project uses five main finance tables:
+
+- `wallets` — balance by physical location and currency
+- `transactions` — income and expense ledger
+- `transfers` — transfers between locations and currency conversions
+- `debts` — receivables and liabilities
+- `debt_payments` — debt payment history
+
+Database changes are tracked through SQL migration files in the `database/` directory.
 
 ## Security
 
@@ -144,8 +187,21 @@ Never commit the real `.env`.
 
 ## Run locally
 
+Install dependencies:
+
 ```bash
 npm ci
+```
+
+Run tests:
+
+```bash
+npm test
+```
+
+Start the bot:
+
+```bash
 npm start
 ```
 
@@ -157,14 +213,85 @@ Only one polling instance of the Telegram bot may use the same bot token at the 
 npm test
 ```
 
-Tests cover the money-input parser, currency-exchange calculations and partial-debt payment input.
+The automated test suite covers:
 
-## Database
+- Money-input parsing
+- EUR and BAM parsing
+- Currency-exchange calculations
+- Returned-change calculations
+- Invalid exchange scenarios
+- Partial debt payment parsing
+- Currency validation
+- Cancellation handling
 
-Migration files live in `database/`.
+## Deployment
 
-For the existing production database, apply only migrations that have not already been run.
+The bot is deployed on Render.
+
+Render runs:
+
+```text
+Build Command:
+npm ci && npm test
+
+Start Command:
+npm start
+```
+
+The application exposes:
+
+```text
+/health
+```
+
+for service health checks.
+
+The production bot uses environment variables configured directly in Render. The real `.env` file is never uploaded to GitHub.
+
+## Project structure
+
+```text
+finance-bot/
+├── database/
+│   ├── 001_atomic_finance_operations.sql
+│   ├── 002_exchange_hardening.sql
+│   ├── 003_partial_debt_payments.sql
+│   ├── 004_wallet_seed.sql
+│   └── README.md
+├── docs/
+│   └── images/
+│       ├── debts.png
+│       ├── monthly-report.png
+│       ├── partial-payment.png
+│       └── wallet-balances.png
+├── src/
+│   ├── db/
+│   ├── handlers/
+│   ├── middleware/
+│   ├── services/
+│   ├── utils/
+│   ├── bot.js
+│   └── index.js
+├── tests/
+├── .env.example
+├── .gitignore
+├── package.json
+├── package-lock.json
+└── README.md
+```
 
 ## Why this project exists
 
-This is not a generic finance-app clone. It was designed around an actual personal workflow, then changed after real usage exposed edge cases that generic models missed: physical wallet locations, multiple cash currencies, returned exchange-office change, moving exchanged cash into a safe later, and partial debt repayment.
+This is not a generic finance-app clone.
+
+It was designed around an actual personal workflow and then improved after real usage exposed edge cases that generic budgeting apps did not handle well:
+
+- Physical wallet locations
+- Multiple cash currencies
+- Returned exchange-office change
+- Moving exchanged cash into a safe later
+- Partial debt repayments
+- Personal daily-wage tracking
+- Monthly reporting through Telegram
+
+The project is both a tool I actively use and a backend-focused portfolio project demonstrating practical problem solving, transactional database design and real-world workflow modeling.
